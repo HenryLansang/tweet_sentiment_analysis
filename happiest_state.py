@@ -1,0 +1,112 @@
+#!/usr/bin/python
+import collections 
+import sys
+import re
+import json
+from state import *
+from term_sentiment import *
+import operator
+
+
+def generate_tweet_geo_dict(raw_tweet_file, states):
+	'''return a dictionary with 50 states as key, a list contains tweet from this state as values.'''
+	tweet_geo_dict = {}
+	# create a dictionary with 50 states as keys and empty list as values:
+	for state in states.keys():
+		tweet_geo_dict[state] = []
+	# print tweet_geo_dict.keys()
+		
+	tweet_list = []
+	count = 0
+	for line in raw_tweet_file: 
+		tweet = json.loads(line) # tweet_file contains json object. json.loads() convert json object into python dictionary
+		done = False # done == true means we find the right geo information
+		
+		if 'place' in tweet.keys(): 
+			# extract geography related information in tweet:
+			if tweet['place'] != None: 
+				if tweet['place']['country_code'] == 'US':
+					if tweet['place']['full_name'] != None:
+						address = str(tweet['place']['full_name'].encode('utf-8'))
+						address = str.split(address)
+						length = len(address)
+						
+						# check if extracted geography information match our database: 
+						for i in range(length):
+							if address[i] in states.keys():
+								done = True
+								state = address[i]
+							if address[i] in states.values():
+								done = True
+								state = address[i]
+						
+								
+		if done == True:
+			# if state is in two letter abbr, we keep it
+			if state in states.keys():
+				pass
+			# otherwise we transform it to corresponding abbr. 
+			else:
+				state = states[state]
+				
+			# extract tweet text from tweet, format it into standard python string:
+			tweet_text = str(tweet['text'].encode('utf-8')) # decode tweet from unicode, and reformatted into python string
+			tweet_text_string = str.split(tweet_text) # break tweet into words
+			tweet_list.append(tweet_text_string)
+			tweet_geo_dict[state].append(tweet_list)
+
+	return tweet_geo_dict
+
+def calculate_sentiment_score(tweet, sentiment_word_dict):
+	score = 0
+	for single_word in tweet:
+		#print single_word ####
+		if single_word in sentiment_word_dict.keys():
+			score = score + sentiment_word_dict[single_word]
+			# print score ####
+		#	print sentiment_word_dict[single_word]
+	return score
+	
+def generate_tweet_geo_dict_with_score(tweet_geo_dict, sentiment_word_dict):
+	'''return a dictionary with 50 states as keys and the average tweets sentiment score 
+	as values. '''
+	state_score_dict = {}
+
+	#print state_score_dict.keys()
+	for state in tweet_geo_dict.keys():
+		score = 0
+		count = 0
+		for tweet_list in tweet_geo_dict[state]:
+			for tweet in tweet_list:
+				#print tweet ####
+				#print '  '
+				score = score + calculate_sentiment_score(tweet, sentiment_word_dict)
+				count = count + 1
+				#print tweet
+			#print score
+		if (count != 0):
+			average_score = score / float(count)
+			state_score_dict[state] = average_score			
+		else:
+			state_score_dict[state] = 0.0
+			
+	return state_score_dict
+
+
+def main(): 
+	#print states.keys()
+	#print states.values()
+	
+	raw_sentiment_file = open(sys.argv[1])	
+	raw_tweet_file = open(sys.argv[2])
+	sentiment_word_dict = generate_sentiment_word_dict(raw_sentiment_file)
+	tweet_geo_dict = generate_tweet_geo_dict(raw_tweet_file, states)
+	# print tweet_and_geo_dict.keys()
+	state_score_dict = generate_tweet_geo_dict_with_score(tweet_geo_dict, sentiment_word_dict)
+	# print state_score_dict
+	state = max(state_score_dict.iteritems(), key=operator.itemgetter(1))[0]
+	print state, state_score_dict[state]
+	
+if __name__ == '__main__':
+	main()
+

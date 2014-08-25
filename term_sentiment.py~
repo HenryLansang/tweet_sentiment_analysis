@@ -1,0 +1,103 @@
+#!/usr/bin/python
+import sys
+import json
+import re
+
+def generate_sentiment_word_dict(sent_file):
+	'''read in given sentiment word file and transfer it to python dictionary'''
+	sentiment_word_dict = {} 
+	for line in sent_file:  
+		word, score  = line.split("\t") # sent_file is .txt file separated by \t tab 
+		sentiment_word_dict[word] = int(score)
+	return sentiment_word_dict
+
+
+def generate_tweet_list(raw_tweet_file):
+	tweet_list = []
+	for line in raw_tweet_file: 
+		tweet = json.loads(line) # tweet_file contains json object. json.loads() convert json object into python dictionary
+		if 'text' in tweet.keys(): 
+			# if the tweet contains text:
+			tweet_text = str(tweet['text'].encode('utf-8')) # decode tweet from unicode, and reformatted into python string
+			tweet_text_string = str.split(tweet_text) # break tweet into words
+			tweet_list.append(tweet_text_string)
+	return tweet_list
+
+
+def generate_non_sentiment_word_list(tweet_list, sentiment_word_dict):
+	'''filte out non-sense word that contains symbol other than alphnum'''
+	temp = set()
+	sentiment_word_list = sentiment_word_dict.keys()
+	for tweet in tweet_list:
+		for word in tweet:
+			if word in sentiment_word_list:
+				pass
+			else:
+				temp.add(word)
+	return list(temp)
+
+
+def calculate_sentiment_score(text, sentiment_word_dict):
+	score = 0
+	for single_word in text:
+		if single_word in sentiment_word_dict.keys():
+			score = score + sentiment_word_dict[single_word]
+	return score
+
+
+def calculate_non_sentiment_word_score(non_sentiment_word, tweet_list, sentiment_word_dict):
+	tweet_score_list = [] # contains tweet and it score, calculated based on given sentiment score
+	for tweet in tweet_list: 
+		tweet_score_list.append(calculate_sentiment_score(tweet, sentiment_word_dict))
+	
+	score = 0
+	count = 0
+	num = 0
+	for tweet in tweet_list:
+		for match_word in tweet:
+			if non_sentiment_word == match_word:
+				score = score + tweet_score_list[num]
+				count = count + 1
+		num = num + 1
+	if count == 0:
+		return 0
+	else:
+		return score/count
+
+def generate_regular_non_sentiment_word_list(non_sentiment_word_list):
+		regular_non_sentiment_word_list = []
+		for word in non_sentiment_word_list:
+			res = re.search(r'^[A-Za-z0-9_@]*$', word)
+			if res != None:
+				regular_non_sentiment_word_list.append( res.group() )
+		return regular_non_sentiment_word_list
+
+
+def main():
+	sent_file = open(sys.argv[1]) # define argv[1] to be sentiment file
+	raw_tweet_file = open(sys.argv[2]) # define argv[2] to be tweet file
+
+	sentiment_word_dict = generate_sentiment_word_dict(sent_file)
+	tweet_list = generate_tweet_list(raw_tweet_file)
+	# print tweet_list
+	non_sentiment_word_list = generate_non_sentiment_word_list(tweet_list, sentiment_word_dict)
+	regular_non_sentiment_word_list = generate_regular_non_sentiment_word_list(non_sentiment_word_list)
+	print len(regular_non_sentiment_word_list)
+	
+	'''tweet_score_list = [] # contains tweet and it score, calculated based on given sentiment score
+	for tweet in tweet_list: 
+		tweet_score_list.append(calculate_sentiment_score(tweet, sentiment_word_dict))
+	print tweet_score_list'''
+
+	
+	for non_sentiment_word in regular_non_sentiment_word_list:
+		score = calculate_non_sentiment_word_score(non_sentiment_word, tweet_list, sentiment_word_dict)
+		print non_sentiment_word, score 
+
+	'''score = calculate_non_sentiment_word_score(non_sentiment_word_list[1], tweet_list, sentiment_word_dict)
+	print non_sentiment_word_list[1], 0, 'fuck'
+	print 0, 'fuck' '''
+
+
+if __name__ == '__main__':
+	main()
